@@ -10,10 +10,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      console.log('Token found in localStorage:', token);
       axios.get('http://localhost:5000/api/users/profile', {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(response => {
+        console.log('User profile fetched:', response.data);
         setUser(response.data);
       })
       .catch(error => {
@@ -24,13 +26,16 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       });
     } else {
+      console.log('No token found in localStorage');
       setLoading(false);
     }
   }, []);
 
   const login = async (email, password) => {
     try {
+      console.log('Attempting login for email:', email);
       const response = await axios.post('http://localhost:5000/api/users/login', { email, password });
+      console.log('Login response:', response.data);
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         setUser(response.data.user);
@@ -41,13 +46,16 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Login error:', error.response?.data || error.message);
+      console.error('Full error object:', error);
       return false;
     }
   };
 
   const register = async (username, email, password) => {
     try {
+      console.log('Registration attempt with:', { username, email, password });
       const response = await axios.post('http://localhost:5000/api/users/register', { username, email, password });
+      console.log('Registration response:', response.data);
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         setUser(response.data.user);
@@ -58,6 +66,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Registration error:', error.response?.data || error.message);
+      console.error('Full error object:', error);
       return false;
     }
   };

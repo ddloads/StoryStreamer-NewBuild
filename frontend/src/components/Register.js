@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { TextField, Button, Typography, Container, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 
 function Register() {
   const [username, setUsername] = useState('');
@@ -10,30 +9,19 @@ function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      // Register the user
-      const registerResponse = await axios.post('http://localhost:5000/api/users/register', {
-        username,
-        email,
-        password
-      });
-      console.log('Registration response:', registerResponse.data);
-      
-      // If registration is successful, log the user in
-      const loginSuccess = await login(email, password);
-      if (loginSuccess) {
+      const success = await register(username, email, password);
+      if (success) {
         navigate('/profile');
       } else {
-        setError('Registration successful, but unable to log in. Please try logging in manually.');
-        console.error('Login failed after successful registration');
+        setError('Registration failed. Please try again.');
       }
     } catch (error) {
-      console.error('Registration error:', error.response?.data || error.message);
       setError(error.response?.data?.error || 'An error occurred during registration');
     }
   };
