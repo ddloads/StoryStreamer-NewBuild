@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+
+frontend/src/firebase.js
+
 # Build files
 build/
 dist/

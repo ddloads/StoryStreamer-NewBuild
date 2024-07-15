@@ -39,7 +39,6 @@ function PrivateRoute({ children, adminRequired = false }) {
   if (!user) {
     return <Navigate to="/login" />;
   }
-
   if (adminRequired && !user.isAdmin) {
     return <Navigate to="/" />;
   }

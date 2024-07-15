@@ -15,14 +15,10 @@ function Register() {
     e.preventDefault();
     setError('');
     try {
-      const success = await register(username, email, password);
-      if (success) {
-        navigate('/profile');
-      } else {
-        setError('Registration failed. Please try again.');
-      }
+      await register(username, email, password);
+      navigate('/profile');
     } catch (error) {
-      setError(error.response?.data?.error || 'An error occurred during registration');
+      setError(error.message);
     }
   };
 

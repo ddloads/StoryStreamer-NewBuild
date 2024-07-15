@@ -1,86 +1,74 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { auth } from '../firebase';
 
 const AuthContext = createContext(null);
+
+const db = getFirestore();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      console.log('Token found in localStorage:', token);
-      axios.get('http://localhost:5000/api/users/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(response => {
-        console.log('User profile fetched:', response.data);
-        setUser(response.data);
-      })
-      .catch(error => {
-        console.error('Error fetching user profile:', error);
-        localStorage.removeItem('token');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-    } else {
-      console.log('No token found in localStorage');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        const userData = userDoc.data();
+        setUser({
+          ...firebaseUser,
+          username: userData?.username,
+          isAdmin: userData?.isAdmin || false
+        });
+      } else {
+        setUser(null);
+      }
       setLoading(false);
-    }
+    });
+
+    return unsubscribe;
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      console.log('Attempting login for email:', email);
-      const response = await axios.post('http://localhost:5000/api/users/login', { email, password });
-      console.log('Login response:', response.data);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
-        return true;
-      } else {
-        console.error('Login failed: No token received');
-        return false;
-      }
-    } catch (error) {
-      console.error('Login error:', error.response?.data || error.message);
-      console.error('Full error object:', error);
-      return false;
-    }
+  const register = async (username, email, password) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Check if this is the first user (to make them an admin)
+    const usersCollection = await getDoc(doc(db, "users", "count"));
+    const isFirstUser = !usersCollection.exists();
+
+    // Store additional user info in Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      username,
+      email,
+      isAdmin: isFirstUser
+    });
+
+    // Update user count
+    await setDoc(doc(db, "users", "count"), { count: (usersCollection.data()?.count || 0) + 1 }, { merge: true });
+
+    return user;
   };
 
-  const register = async (username, email, password) => {
-    try {
-      console.log('Registration attempt with:', { username, email, password });
-      const response = await axios.post('http://localhost:5000/api/users/register', { username, email, password });
-      console.log('Registration response:', response.data);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
-        return true;
-      } else {
-        console.error('Registration failed: No token received');
-        return false;
-      }
-    } catch (error) {
-      console.error('Registration error:', error.response?.data || error.message);
-      console.error('Full error object:', error);
-      return false;
-    }
+  const login = (email, password) => {
+    return signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+    return signOut(auth);
   };
 
   const value = {
     user,
     loading,
-    login,
     register,
+    login,
     logout
   };
 

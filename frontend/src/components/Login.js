@@ -14,15 +14,10 @@ function Login() {
     e.preventDefault();
     setError('');
     try {
-      const success = await login(email, password);
-      if (success) {
-        navigate('/profile');
-      } else {
-        setError('Login failed. Please check your email and password.');
-      }
+      await login(email, password);
+      navigate('/profile');
     } catch (error) {
-      console.error('Login error:', error);
-      setError('An error occurred during login. Please try again.');
+      setError(error.message);
     }
   };
 
