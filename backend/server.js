@@ -1,7 +1,13 @@
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+
+import audiobooksRouter from './routes/audiobooks.js';
+import usersRouter from './routes/users.js';
+import adminRouter from './routes/admin.js';
+
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -14,12 +20,10 @@ mongoose.connect(uri)
   .then(() => console.log("MongoDB database connection established successfully"))
   .catch(err => console.log("MongoDB connection error: ", err));
 
-const audiobooksRouter = require('./routes/audiobooks');
-const usersRouter = require('./routes/users');
-
 app.use('/api/audiobooks', audiobooksRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/admin', adminRouter);
 
 app.listen(port, () => {
-    console.log(`Server is running on port: ${port}`);
+  console.log(`Server is running on port: ${port}`);
 });

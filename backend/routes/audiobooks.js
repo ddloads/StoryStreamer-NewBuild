@@ -1,7 +1,9 @@
-const router = require('express').Router();
-let Audiobook = require('../models/audiobook.model');
-const User = require('../models/user.model');
-const auth = require('../middleware/auth');
+import express from 'express';
+import Audiobook from '../models/audiobook.model.js';
+import User from '../models/user.model.js';
+import verifyToken from '../middleware/auth.js';
+
+const router = express.Router();
 
 // GET all audiobooks (with filtering, sorting, and pagination)
 router.route('/').get(async (req, res) => {
@@ -213,7 +215,7 @@ router.route('/update/:id').post((req, res) => {
 });
 
 // GET enhanced personalized recommendations
-router.get('/recommendations', auth, async (req, res) => {
+router.get('/recommendations', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
       .populate('favoriteAudiobooks')
@@ -388,4 +390,4 @@ function editDistance(s1, s2) {
 }
 
 
-module.exports = router;
+export default router;

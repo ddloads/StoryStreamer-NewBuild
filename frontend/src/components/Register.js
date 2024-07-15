@@ -1,15 +1,41 @@
 import React, { useState } from 'react';
 import { TextField, Button, Typography, Container, Box } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement registration logic
-    console.log('Registration attempt with:', username, email, password);
+    setError('');
+    try {
+      // Register the user
+      const registerResponse = await axios.post('http://localhost:5000/api/users/register', {
+        username,
+        email,
+        password
+      });
+      console.log('Registration response:', registerResponse.data);
+      
+      // If registration is successful, log the user in
+      const loginSuccess = await login(email, password);
+      if (loginSuccess) {
+        navigate('/profile');
+      } else {
+        setError('Registration successful, but unable to log in. Please try logging in manually.');
+        console.error('Login failed after successful registration');
+      }
+    } catch (error) {
+      console.error('Registration error:', error.response?.data || error.message);
+      setError(error.response?.data?.error || 'An error occurred during registration');
+    }
   };
 
   return (
@@ -18,7 +44,12 @@ function Register() {
         <Typography component="h1" variant="h5">
           Register
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+        {error && (
+          <Typography color="error" sx={{ mt: 2 }}>
+            {error}
+          </Typography>
+        )}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           <TextField
             margin="normal"
             required

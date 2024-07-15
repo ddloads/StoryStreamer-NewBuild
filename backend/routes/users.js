@@ -1,18 +1,57 @@
-const router = require('express').Router();
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
-const Audiobook = require('../models/audiobook.model');
-const auth = require('../middleware/auth');
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import User from '../models/user.model.js';
+import Audiobook from '../models/audiobook.model.js';
+import verifyToken from '../middleware/auth.js';
+
+const router = express.Router();
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // User registration
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    const user = new User({ username, email, password });
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    // Check if this is the first user (to make them an admin)
+    const isFirstUser = (await User.countDocuments({})) === 0;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+      isAdmin: isFirstUser // Set isAdmin to true if this is the first user
+    });
+
     await user.save();
-    res.status(201).json({ message: 'User registered successfully' });
+
+    // Create and assign a token
+    const token = jwt.sign(
+      { userId: user._id, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        isAdmin: user.isAdmin
+      }
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -24,15 +63,15 @@ router.post('/login', async (req, res) => {
     if (!user || !(await user.comparePassword(password))) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Get user profile
-router.get('/profile', auth, async (req, res) => {
+/* // Get user profile
+router.get('/profile',  auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
       .populate('favoriteAudiobooks')
@@ -48,10 +87,67 @@ router.get('/profile', auth, async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
+}); */
+
+// Get user profile
+router.get('/profile', verifyToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId)
+      .populate('favoriteAudiobooks')
+      .populate('listeningHistory.audiobook');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Calculate listening stats
+    const totalListeningTime = user.listeningHistory.reduce((total, item) => total + item.progress, 0);
+    const completedBooksCount = user.completedBooks.length;
+    
+    // Find favorite genre
+    const genreCounts = {};
+    user.listeningHistory.forEach(item => {
+      genreCounts[item.audiobook.genre] = (genreCounts[item.audiobook.genre] || 0) + 1;
+    });
+    const favoriteGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+
+    res.json({
+      username: user.username,
+      email: user.email,
+      totalListeningTime,
+      completedBooksCount,
+      favoriteGenre,
+      favoriteAudiobooks: user.favoriteAudiobooks,
+      listeningHistory: user.listeningHistory.slice(0, 5) // Get only the 5 most recent
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching user profile' });
+  }
+});
+
+// Update user profile
+router.put('/profile', verifyToken, async (req, res) => {
+  try {
+    const { username, email } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.username = username || user.username;
+    user.email = email || user.email;
+
+    await user.save();
+
+    res.json({ message: 'Profile updated successfully', user: { username: user.username, email: user.email } });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating user profile' });
+  }
 });
 
 // Add an audiobook to favorites
-router.post('/favorites/add', auth, async (req, res) => {
+router.post('/favorites/add', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     const { audiobookId } = req.body;
@@ -68,7 +164,7 @@ router.post('/favorites/add', auth, async (req, res) => {
 });
 
 // Remove an audiobook from favorites
-router.post('/favorites/remove', auth, async (req, res) => {
+router.post('/favorites/remove', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     const { audiobookId } = req.body;
@@ -83,7 +179,7 @@ router.post('/favorites/remove', auth, async (req, res) => {
 });
 
 // Update listening history
-router.post('/history/update', auth, async (req, res) => {
+router.post('/history/update', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     const { audiobookId, progress } = req.body;
@@ -109,7 +205,7 @@ router.post('/history/update', auth, async (req, res) => {
 });
 
 // GET expanded user statistics
-router.get('/stats', auth, async (req, res) => {
+router.get('/stats', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId)
       .populate('favoriteAudiobooks')
@@ -293,7 +389,7 @@ router.get('/stats', auth, async (req, res) => {
 });
 
 // Mark a book as completed
-router.post('/complete-book', auth, async (req, res) => {
+router.post('/complete-book', verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     const { audiobookId } = req.body;
@@ -337,4 +433,4 @@ function calculatePercentile(array, value) {
 }
 
 
-module.exports = router;
+export default router;

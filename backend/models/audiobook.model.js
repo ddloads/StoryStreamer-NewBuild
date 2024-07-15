@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const Schema = mongoose.Schema;
 
@@ -31,4 +31,4 @@ const audiobookSchema = new Schema({
 
 const Audiobook = mongoose.model('Audiobook', audiobookSchema);
 
-module.exports = Audiobook;
+export default Audiobook;
