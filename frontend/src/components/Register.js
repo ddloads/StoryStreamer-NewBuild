@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { TextField, Button, Typography, Container, Box } from '@mui/material';
+import { TextField, Button, Typography, Container, Box, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logger from '../utils/logger';
 
 function Register() {
   const [username, setUsername] = useState('');
@@ -14,11 +15,27 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    logger.info('Registration form submitted', { username, email });
+
+    if (!username || !email || !password) {
+      logger.warn('Registration failed: missing fields');
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      logger.warn('Registration failed: password too short');
+      setError('Password should be at least 6 characters long');
+      return;
+    }
+
     try {
-      await register(username, email, password);
-      navigate('/profile');
+      const { isAdmin } = await register(username, email, password);
+      logger.info('Registration successful', { isAdmin });
+      navigate(isAdmin ? '/admin' : '/profile');
     } catch (error) {
-      setError(error.message);
+      logger.error('Registration failed', error.response?.data || error.message);
+      setError(error.response?.data?.error || 'An error occurred during registration');
     }
   };
 
@@ -28,12 +45,8 @@ function Register() {
         <Typography component="h1" variant="h5">
           Register
         </Typography>
-        {error && (
-          <Typography color="error" sx={{ mt: 2 }}>
-            {error}
-          </Typography>
-        )}
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+        {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
           <TextField
             margin="normal"
             required

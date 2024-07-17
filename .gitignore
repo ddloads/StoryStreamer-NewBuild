@@ -3,7 +3,7 @@ node_modules/
 
 
 frontend/src/firebase.js
-
+backend/serviceAccountKey.json
 # Build files
 build/
 dist/

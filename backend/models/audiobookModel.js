@@ -25,6 +25,12 @@ const audiobookSchema = new Schema({
     name: String,
     bookNumber: Number
   },
+  language: { type: String, default: 'English' },
+  publisher: String,
+  isbn: String,
+  tags: [String],
+  averageRating: { type: Number, min: 0, max: 5 },
+  numberOfRatings: { type: Number, default: 0 },
 }, {
   timestamps: true,
 });

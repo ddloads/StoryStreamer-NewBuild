@@ -1,9 +1,6 @@
-import User from '../models/user.model.js';
-
-const isAdmin = async (req, res, next) => {
+const checkAdmin = async (req, res, next) => {
   try {
-    const user = await User.findById(req.userId);
-    if (user && user.isAdmin) {
+    if (req.user && req.user.isAdmin) {
       next();
     } else {
       res.status(403).json({ error: 'Access denied. Admin privileges required.' });
@@ -13,4 +10,4 @@ const isAdmin = async (req, res, next) => {
   }
 };
 
-export { isAdmin };
+export default checkAdmin;

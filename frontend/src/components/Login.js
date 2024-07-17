@@ -1,7 +1,10 @@
+// src/components/login.js
+
 import React, { useState } from 'react';
-import { TextField, Button, Typography, Container, Box } from '@mui/material';
+import { TextField, Button, Typography, Container, Box, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logger from '../utils/logger';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -13,11 +16,14 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    logger.info('Login form submitted', { email });
     try {
       await login(email, password);
+      logger.info('Login successful, navigating to profile');
       navigate('/profile');
     } catch (error) {
-      setError(error.message);
+      logger.error('Login failed', error.response?.data || error.message);
+      setError(error.response?.data?.error || 'Failed to log in');
     }
   };
 
@@ -27,11 +33,7 @@ function Login() {
         <Typography component="h1" variant="h5">
           Login
         </Typography>
-        {error && (
-          <Typography color="error" sx={{ mt: 2 }}>
-            {error}
-          </Typography>
-        )}
+        {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
           <TextField
             margin="normal"

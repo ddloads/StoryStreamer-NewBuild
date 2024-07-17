@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import { Container, Typography, TextField, Button, Box, Alert } from '@mui/material';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function AdminDashboard() {
   const [databaseLocation, setDatabaseLocation] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const { currentUser } = useAuth();
+
+  if (!currentUser || !currentUser.isAdmin) {
+    return <Alert severity="error">Access denied. Admin privileges required.</Alert>;
+  }
 
   const handleAddLocation = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/add-database-location', { location: databaseLocation }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const response = await axios.post('http://localhost:5000/api/admin/add-database-location', 
+        { location: databaseLocation },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
       setMessage(response.data.message);
       setError('');
     } catch (err) {
@@ -22,9 +29,10 @@ function AdminDashboard() {
 
   const handleScan = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/scan-audiobooks', { location: databaseLocation }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const response = await axios.post('http://localhost:5000/api/admin/scan-audiobooks', 
+        { location: databaseLocation },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
       setMessage(response.data.message);
       setError('');
     } catch (err) {

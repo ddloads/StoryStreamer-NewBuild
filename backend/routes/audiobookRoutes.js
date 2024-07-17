@@ -1,9 +1,13 @@
+// routes/audiobookRoutes.js
 import express from 'express';
-import Audiobook from '../models/audiobook.model.js';
-import User from '../models/user.model.js';
-import verifyToken from '../middleware/auth.js';
+import Audiobook from '../models/audiobookModel.js';
+import User from '../models/userModel.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Apply authMiddleware to all routes
+router.use(authMiddleware);
 
 // GET all audiobooks (with filtering, sorting, and pagination)
 router.route('/').get(async (req, res) => {
@@ -21,7 +25,7 @@ router.route('/').get(async (req, res) => {
     }
 
     if (sort) {
-      const [field, order] = sort.split(':');
+      const [field, order] = sort.split(':' );
       sortOption[field] = order === 'desc' ? -1 : 1;
     } else {
       sortOption = { createdAt: -1 }; // Default sort by creation date, newest first
@@ -67,8 +71,7 @@ router.route('/recent').get((req, res) => {
     .catch(err => res.status(400).json('Error: ' + err));
 });
 
-
-// Search route
+/* // Standard Search route
 router.get('/search', async (req, res) => {
   const { query } = req.query;
   
@@ -84,6 +87,46 @@ router.get('/search', async (req, res) => {
     });
     
     res.json(results);
+  } catch (err) {
+    res.status(400).json('Error: ' + err);
+  }
+}); */
+
+// Paginated Search
+router.get('/search', async (req, res) => {
+  const { query, page = 1, limit = 20 } = req.query;
+  
+  try {
+    const skip = (page - 1) * limit;
+    
+    const results = await Audiobook.find({
+      $or: [
+        { title: { $regex: query, $options: 'i' } },
+        { authors: { $elemMatch: { $regex: query, $options: 'i' } } },
+        { narrator: { $regex: query, $options: 'i' } },
+        { genre: { $regex: query, $options: 'i' } },
+        { 'series.name': { $regex: query, $options: 'i' } }
+      ]
+    })
+    .skip(skip)
+    .limit(parseInt(limit));
+    
+    const total = await Audiobook.countDocuments({
+      $or: [
+        { title: { $regex: query, $options: 'i' } },
+        { authors: { $elemMatch: { $regex: query, $options: 'i' } } },
+        { narrator: { $regex: query, $options: 'i' } },
+        { genre: { $regex: query, $options: 'i' } },
+        { 'series.name': { $regex: query, $options: 'i' } }
+      ]
+    });
+    
+    res.json({
+      results,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalResults: total
+    });
   } catch (err) {
     res.status(400).json('Error: ' + err);
   }
@@ -215,9 +258,9 @@ router.route('/update/:id').post((req, res) => {
 });
 
 // GET enhanced personalized recommendations
-router.get('/recommendations', verifyToken, async (req, res) => {
+router.get('/recommendations', async (req, res) => {
   try {
-    const user = await User.findById(req.userId)
+    const user = await User.findById(req.user.userId)
       .populate('favoriteAudiobooks')
       .populate('listeningHistory.audiobook')
       .populate('completedBooks');
@@ -388,6 +431,5 @@ function editDistance(s1, s2) {
   }
   return costs[s2.length];
 }
-
 
 export default router;

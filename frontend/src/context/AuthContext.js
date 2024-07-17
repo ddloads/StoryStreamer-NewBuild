@@ -1,84 +1,93 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged 
-} from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
-import { auth } from '../firebase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import logger from '../utils/logger';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-const db = getFirestore();
+export function useAuth() {
+  return useContext(AuthContext);
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        const userData = userDoc.data();
-        setUser({
-          ...firebaseUser,
-          username: userData?.username,
-          isAdmin: userData?.isAdmin || false
-        });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+  async function register(username, email, password) {
+    logger.info('Attempting to register user:', { username, email });
+    try {
+      const response = await axios.post('http://localhost:5000/api/users/register', {
+        username,
+        email,
+        password
+      });
+      
+      logger.info('Registration successful', response.data);
+      const { token, userId, isAdmin } = response.data;
+      localStorage.setItem('token', token);
+      setCurrentUser({ id: userId, email, isAdmin });
+      return { isAdmin };
+    } catch (error) {
+      logger.error('Registration error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 
-    return unsubscribe;
+  async function login(email, password) {
+    logger.info('Attempting to log in user:', { email });
+    try {
+      const response = await axios.post('http://localhost:5000/api/users/login', {
+        email,
+        password
+      });
+      
+      logger.info('Login successful', response.data);
+      const { token, userId, isAdmin } = response.data;
+      localStorage.setItem('token', token);
+      setCurrentUser({ id: userId, email, isAdmin });
+    } catch (error) {
+      logger.error('Login error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  function logout() {
+    logger.info('Logging out user');
+    localStorage.removeItem('token');
+    setCurrentUser(null);
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      logger.info('Token found, fetching user profile');
+      axios.get('http://localhost:5000/api/users/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(response => {
+        logger.info('User profile fetched successfully', response.data);
+        setCurrentUser(response.data);
+      })
+      .catch(error => {
+        logger.error('Error fetching user profile:', error.response?.data || error.message);
+        localStorage.removeItem('token');
+      })
+      .finally(() => setLoading(false));
+    } else {
+      logger.info('No token found, user is not logged in');
+      setLoading(false);
+    }
   }, []);
 
-  const register = async (username, email, password) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    // Check if this is the first user (to make them an admin)
-    const usersCollection = await getDoc(doc(db, "users", "count"));
-    const isFirstUser = !usersCollection.exists();
-
-    // Store additional user info in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      username,
-      email,
-      isAdmin: isFirstUser
-    });
-
-    // Update user count
-    await setDoc(doc(db, "users", "count"), { count: (usersCollection.data()?.count || 0) + 1 }, { merge: true });
-
-    return user;
-  };
-
-  const login = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
-  };
-
-  const logout = () => {
-    return signOut(auth);
-  };
-
   const value = {
-    user,
-    loading,
+    currentUser,
     register,
     login,
     logout
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === null) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+}
